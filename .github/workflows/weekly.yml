@@ -1,0 +1,44 @@
+name: Weekly Combo Generation
+
+# 매주 월요일 09:00 KST (= 00:00 UTC) 자동 실행
+# + GitHub 웹에서 수동 실행도 가능 (workflow_dispatch)
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install numpy
+
+      - name: Fetch latest draw data (best effort)
+        run: python fetch_latest.py
+        continue-on-error: true
+
+      - name: Generate combos
+        run: python cloud_run.py
+
+      - name: Commit and push
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add round_*.json rounds.json
+          if git diff --cached --quiet; then
+            echo "변경 사항 없음. 커밋 건너뜀."
+          else
+            git commit -m "auto: 주간 분석 $(date -u +%Y-%m-%d)"
+            git push
+          fi
